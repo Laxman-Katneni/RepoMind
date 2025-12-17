@@ -1,0 +1,29 @@
+package com.reviewassistant.service.dto;
+
+/**
+ * Request DTO for chat messages.
+ */
+public class ChatRequest {
+    
+    private String message;
+    private Long repoId;
+    
+    public ChatRequest() {
+    }
+    
+    public String getMessage() {
+        return message;
+    }
+    
+    public void setMessage(String message) {
+        this.message = message;
+    }
+    
+    public Long getRepoId() {
+        return repoId;
+    }
+    
+    public void setRepoId(Long repoId) {
+        this.repoId = repoId;
+    }
+}

@@ -538,6 +538,121 @@ public class GithubService {
     }
     
     /**
+     * Get all file paths in a repository recursively using the Git Trees API.
+     * More efficient than listing contents recursively.
+     * 
+     * @param owner Repository owner
+     * @param repo Repository name
+     * @param token GitHub OAuth access token
+     * @return List of all file paths in the repository
+     */
+    public List<String> getRepositoryFilePaths(String owner, String repo, String token) {
+        logger.info("Fetching file tree for {}/{}", owner, repo);
+        
+        try {
+            // First, get the default branch
+            Map<String, Object> repoInfo = restClient.get()
+                .uri("/repos/{owner}/{repo}", owner, repo)
+                .header("Authorization", "Bearer " + token)
+                .header("Accept", "application/vnd.github+json")
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            
+            String defaultBranch = repoInfo != null ? (String) repoInfo.get("default_branch") : "main";
+            
+            // Get the SHA of the default branch
+            Map<String, Object> branchInfo = restClient.get()
+                .uri("/repos/{owner}/{repo}/branches/{branch}", owner, repo, defaultBranch)
+                .header("Authorization", "Bearer " + token)
+                .header("Accept", "application/vnd.github+json")
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            
+            @SuppressWarnings("unchecked")
+            Map<String, Object> commit = (Map<String, Object>) branchInfo.get("commit");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> commitData = (Map<String, Object>) commit.get("commit");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> tree = (Map<String, Object>) commitData.get("tree");
+            String treeSha = (String) tree.get("sha");
+            
+            // Fetch the entire tree recursively
+            Map<String, Object> treeData = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .path("/repos/{owner}/{repo}/git/trees/{tree_sha}")
+                    .queryParam("recursive", "1")
+                    .build(owner, repo, treeSha))
+                .header("Authorization", "Bearer " + token)
+                .header("Accept", "application/vnd.github+json")
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> treeItems = (List<Map<String, Object>>) treeData.get("tree");
+            
+            // Filter to only files (type: "blob")
+            List<String> filePaths = new ArrayList<>();
+            for (Map<String, Object> item : treeItems) {
+                if ("blob".equals(item.get("type"))) {
+                    filePaths.add((String) item.get("path"));
+                }
+            }
+            
+            logger.info("Found {} files in {}/{}", filePaths.size(), owner, repo);
+            return filePaths;
+            
+        } catch (Exception e) {
+            logger.error("Failed to fetch file tree for {}/{}: {}", owner, repo, e.getMessage());
+            throw new GithubException("Failed to fetch repository file tree: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Get the content of a specific file from a repository.
+     * 
+     * @param owner Repository owner
+     * @param name Repository name
+     * @param filePath Path to the file
+     * @param token GitHub OAuth access token
+     * @return Decoded file content as String
+     */
+    public String getFileContent(String owner, String name, String filePath, String token) {
+        logger.debug("Fetching content for file: {}", filePath);
+        
+        try {
+            Map<String, Object> fileData = restClient.get()
+                .uri("/repos/{owner}/{repo}/contents/{path}", owner, name, filePath)
+                .header("Authorization", "Bearer " + token)
+                .header("Accept", "application/vnd.github+json")
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            
+            if (fileData == null) {
+                throw new GithubException("File not found: " + filePath);
+            }
+            
+            // GitHub returns base64-encoded content
+            String base64Content = (String) fileData.get("content");
+            if (base64Content == null) {
+                throw new GithubException("No content returned for file: " + filePath);
+            }
+            
+            // Decode base64 (remove newlines first)
+            String cleanedBase64 = base64Content.replaceAll("\\s", "");
+            byte[] decodedBytes = Base64.getDecoder().decode(cleanedBase64);
+            String content = new String(decodedBytes);
+            
+            logger.debug("Successfully fetched {} bytes for file: {}", content.length(), filePath);
+            return content;
+            
+        } catch (Exception e) {
+            logger.error("Failed to fetch content for {}: {}", filePath, e.getMessage());
+            throw new GithubException("Failed to fetch file content: " + e.getMessage(), e);
+        }
+    }
+
+    
+    /**
      * Handle HTTP client errors from GitHub API.
      * Specifically detects rate limiting (403/429) and throws appropriate exceptions.
      */

@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Chat from './pages/Chat'
 import PullRequestList from './pages/PullRequestList'
 import ReviewResult from './pages/ReviewResult'
+import AuditResults from './pages/AuditResults'
 import './index.css'
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
         <Route path="/app/pull-requests" element={<PullRequestList />} />
         <Route path="/app/pull-requests/:prId/review" element={<ReviewResult />} />
         <Route path="/app/chat" element={<Chat />} />
+        <Route path="/app/audit-results/:auditId" element={<AuditResults />} />
       </Routes>
     </BrowserRouter>
   )

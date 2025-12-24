@@ -30,7 +30,7 @@ public class RagService {
     private static final Logger logger = LoggerFactory.getLogger(RagService.class);
     private static final int CHUNK_SIZE = 1000;  // characters per chunk
     private static final int CHUNK_OVERLAP = 200;  // overlap between chunks
-    private static final int RETRIEVAL_LIMIT = 5;  // number of chunks to retrieve
+    private static final int RETRIEVAL_LIMIT = 3;  // Reduced from 5 for faster processing
     
     private final GithubService githubService;
     private final CodeChunkRepository codeChunkRepository;

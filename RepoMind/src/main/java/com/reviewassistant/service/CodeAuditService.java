@@ -27,10 +27,10 @@ public class CodeAuditService {
 
     private static final Logger logger = LoggerFactory.getLogger(CodeAuditService.class);
 
-    // Performance optimization constants
-    private static final int MAX_FILE_SIZE_KB = 100; // Skip files larger than 100KB
-    private static final int MAX_FILES_PER_AUDIT = 50; // Limit total files analyzed
-    private static final int PARALLEL_BATCH_SIZE = 5; // Process 5 files in parallel
+    // Performance optimization constants (Level 4: Ultra-Aggressive for free tier)
+    private static final int MAX_FILE_SIZE_KB = 10; // Skip files larger than 10KB (smaller files = faster)
+    private static final int MAX_FILES_PER_AUDIT = 10; // Limit to 10 most critical files
+    private static final int PARALLEL_BATCH_SIZE = 2; // Process 2 files in parallel (smaller batches)
 
     // Directories and files to skip (blocklist)
     private static final Set<String> SKIP_DIRECTORIES = Set.of(
@@ -47,18 +47,46 @@ public class CodeAuditService {
         "api", "routes", "handlers", "core"
     );
 
-    // File extensions to audit (expanded to include config files)
+    // Level 3: ONLY code files (skip styling, docs, configs)
     private static final Set<String> AUDITABLE_EXTENSIONS = Set.of(
         ".java", ".py", ".js", ".ts", ".tsx", ".jsx",
-        ".html", ".css", ".xml", ".properties", 
-        ".yml", ".yaml", ".sql", ".json", ".md",
         ".go", ".rs", ".rb", ".php", ".c", ".cpp", ".h"
+        // Excluded: .css, .html, .json, .md, .xml, .yml
+    );
+
+    // Level 4: Ultra-strict - skip everything except critical patterns
+    private static final Set<String> SKIP_UI_PATTERNS = Set.of(
+        "loading", "not-found", "error", "404", "500",
+        "layout", "_app", "_document",
+        "-card", "-badge", "-avatar", "-icon", "-button",
+        "-chart", "-graph", "-skeleton", "-spinner",
+        "component", "util", "helper", "constant", "config",
+        "type", "interface", "enum", "dto"
+    );
+
+    // Level 4: ONLY security-critical files (ultra-strict)
+    private static final Set<String> CRITICAL_PATTERNS = Set.of(
+        // API & Routes
+        "api/", "route", "endpoint", "view", "handler",
+        // Actions & Server Logic  
+        "action", "server", "service",
+        // Authentication & Security
+        "auth", "login", "signin", "signup", "password",
+        "middleware", "guard", "protect", "security",
+        // Data & Validation
+        "schema", "validation", "validator", "form",
+        "model", "database", "prisma", "query",
+        // Critical Business Logic
+        "payment", "checkout", "billing", "stripe",
+        "upload", "file", "storage",
+        // Python-specific
+        "views.py", "urls.py", "models.py", "serializers.py", "settings.py"
     );
 
     private final CodeAuditRepository codeAuditRepository;
     private final AuditFindingRepository auditFindingRepository;
     private final RepositoryRepository repositoryRepository;
-    private final HuggingFaceAuditService huggingFaceAuditService;
+    private final com.reviewassistant.service.audit.AuditService auditService;
     private final GithubService githubService;
     private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
@@ -68,7 +96,8 @@ public class CodeAuditService {
             CodeAuditRepository codeAuditRepository,
             AuditFindingRepository auditFindingRepository,
             RepositoryRepository repositoryRepository,
-            HuggingFaceAuditService huggingFaceAuditService,
+            @org.springframework.beans.factory.annotation.Qualifier("activeAuditService")  // Configured via audit.service.mode property
+            com.reviewassistant.service.audit.AuditService auditService,
             GithubService githubService,
             ObjectMapper objectMapper,
             SimpMessagingTemplate messagingTemplate,
@@ -76,7 +105,7 @@ public class CodeAuditService {
         this.codeAuditRepository = codeAuditRepository;
         this.auditFindingRepository = auditFindingRepository;
         this.repositoryRepository = repositoryRepository;
-        this.huggingFaceAuditService = huggingFaceAuditService;
+        this.auditService = auditService;
         this.githubService = githubService;
         this.objectMapper = objectMapper;
         this.messagingTemplate = messagingTemplate;
@@ -185,12 +214,12 @@ public class CodeAuditService {
                                 repository.getId()
                             );
 
-                            // Analyze with HF model (with intelligent RAG context)
-                            AuditResult result = huggingFaceAuditService.analyzeCodeWithContext(
+                            // Analyze with multi-tier audit service (with intelligent RAG context)
+                            AuditResult result = auditService.analyzeCode(
                                 content, language, filePath, relevantContext
                             );
 
-                            return new FileScanResult(filePath, result, null, false);
+                            return new FileScanResult(filePath, result, null, true);
 
                         } catch (Exception e) {
                             logger.error("Failed to scan {}: {}", filePath, e.getMessage());
@@ -525,25 +554,49 @@ public class CodeAuditService {
     }
 
     /**
-     * Determines if a file should be auditable using blocklist + extension strategy.
+     * Level 3 filtering: Aggressive filtering for critical files only.
+     * Focuses on architecture & security audit needs.
      */
     private boolean isAuditableFile(String filePath) {
-        // Blocklist - skip bad directories
+        String lowerPath = filePath.toLowerCase();
+        
+        // Step 1: Blocklist - skip bad directories
         for (String dir : SKIP_DIRECTORIES) {
-            if (filePath.contains("/" + dir + "/") || filePath.contains("\\" + dir + "\\") ||
-                filePath.startsWith(dir + "/") || filePath.startsWith(dir + "\\")) {
+            if (lowerPath.contains("/" + dir + "/") || lowerPath.contains("\\" + dir + "\\") ||
+                lowerPath.startsWith(dir + "/") || lowerPath.startsWith(dir + "\\")) {
                 return false;
             }
         }
 
-        // Extension check - must end with supported extension
+        // Step 2: Extension check - must end with code extension
+        boolean hasValidExtension = false;
         for (String ext : AUDITABLE_EXTENSIONS) {
-            if (filePath.endsWith(ext)) {
-                return true;
+            if (lowerPath.endsWith(ext)) {
+                hasValidExtension = true;
+                break;
+            }
+        }
+        if (!hasValidExtension) {
+            return false;
+        }
+
+        // Step 3: Level 3 - Skip UI-only patterns
+        for (String pattern : SKIP_UI_PATTERNS) {
+            if (lowerPath.contains(pattern)) {
+                // Exception: Keep if it's a critical file
+                boolean isCritical = CRITICAL_PATTERNS.stream()
+                    .anyMatch(lowerPath::contains);
+                if (!isCritical) {
+                    return false; // Skip UI component
+                }
             }
         }
 
-        return false;
+        // Step 4: Prioritize critical files
+        // If file doesn't match critical patterns, it's lower priority
+        // Still include it if we have room, but it won't be prioritized
+        
+        return true;
     }
 
     /**
@@ -562,11 +615,11 @@ public class CodeAuditService {
             finding.setSuggestion(result.suggestion());
 
             // Extract line number from evidence
-            Integer lineNumber = huggingFaceAuditService.extractLineNumber(result);
+            Integer lineNumber = extractLineNumber(result);
             finding.setLineNumber(lineNumber);
 
             // Extract code snippet
-            String snippet = huggingFaceAuditService.extractCodeSnippet(result);
+            String snippet = extractCodeSnippet(result);
             finding.setCodeSnippet(snippet);
 
             // Store full metadata as JSON
@@ -606,5 +659,56 @@ public class CodeAuditService {
     public CodeAudit getLatestAuditForRepository(Long repositoryId) {
         return codeAuditRepository.findTopByRepositoryIdOrderByStartedAtDesc(repositoryId)
             .orElse(null);
+    }
+
+    /**
+     * Extracts line number from evidence array.
+     * Looks for patterns like "@L123:" in the evidence.
+     */
+    private Integer extractLineNumber(AuditResult result) {
+        if (result == null || result.getEvidence().isEmpty()) {
+            return null;
+        }
+        
+        for (String evidence : result.getEvidence()) {
+            if (evidence.startsWith("@L")) {
+                try {
+                    int colonIndex = evidence.indexOf(":");
+                    if (colonIndex > 2) {
+                        String lineNum = evidence.substring(2, colonIndex);
+                        return Integer.parseInt(lineNum);
+                    }
+                } catch (NumberFormatException e) {
+                    // Continue to next evidence
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Extracts code snippet from evidence array.
+     * Returns the first evidence that looks like code.
+     */
+    private String extractCodeSnippet(AuditResult result) {
+        if (result == null || result.getEvidence().isEmpty()) {
+            return null;
+        }
+        
+        for (String evidence : result.getEvidence()) {
+            // Remove line number prefix if present
+            if (evidence.startsWith("@L")) {
+                int colonIndex = evidence.indexOf(":");
+                if (colonIndex > 0 && colonIndex < evidence.length() - 1) {
+                    return evidence.substring(colonIndex + 1).trim();
+                }
+            } else if (evidence.length() > 10) {
+                // Return first substantial evidence
+                return evidence;
+            }
+        }
+        
+        return null;
     }
 }

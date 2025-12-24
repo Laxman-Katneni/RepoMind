@@ -27,4 +27,29 @@ public record HuggingFaceAuditRequest(
         
         return new HuggingFaceAuditRequest(messages, 0.2, 2000);
     }
+
+    public static HuggingFaceAuditRequest forCodeWithContext(
+            String code, String language, String filePath, String repoStructure) {
+        String systemMessage = String.format(
+            "Analyze this %s code for quality and architectural issues. " +
+            "Consider the file's role in the overall architecture. Return strict JSON.",
+            language
+        );
+        
+        String userMessage = String.format("""
+            %s
+            
+            File: %s
+            
+            Code to analyze:
+            %s
+            """, repoStructure, filePath, code);
+        
+        List<Message> messages = List.of(
+            new Message("system", systemMessage),
+            new Message("user", userMessage)
+        );
+        
+        return new HuggingFaceAuditRequest(messages, 0.2, 2000);
+    }
 }

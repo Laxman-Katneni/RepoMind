@@ -12,7 +12,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        // Enable simple in-memory message broker
+        // Simple in-memory broker (for single-instance deployment)
+        // For multi-instance scaling, replace with RabbitMQ or Redis Pub/Sub
+        // See: https://docs.spring.io/spring-framework/reference/web/websocket/stomp/handle-broker-relay.html
         config.enableSimpleBroker("/topic");
         
         // Application destination prefix for client messages
@@ -22,8 +24,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Register WebSocket endpoint with SockJS fallback
+        // Allow origins from frontend dev and production
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("http://localhost:3000", "http://localhost:5173")
+                .setAllowedOriginPatterns("http://localhost:*", "https://*.railway.app", "https://*.render.com")
                 .withSockJS();
     }
 }

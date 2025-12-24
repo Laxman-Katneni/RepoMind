@@ -56,12 +56,33 @@ public class HuggingFaceAuditService {
         backoff = @Backoff(delay = 2000, multiplier = 2.0)
     )
     public AuditResult analyzeCode(String code, String language, String filePath) {
+        return analyzeCodeWithContext(code, language, filePath, null);
+    }
+
+    /**
+     * Analyzes code WITH repository structure context for better architectural insights.
+     * 
+     * @param code The source code to analyze
+     * @param language The programming language
+     * @param filePath The file path for context
+     * @param repoStructure The repository structure (optional, for architectural insights)
+     * @return AuditResult or null if analysis fails
+     */
+    @Retryable(
+        retryFor = {RestClientException.class},
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 2000, multiplier = 2.0)
+    )
+    public AuditResult analyzeCodeWithContext(String code, String language, String filePath, String repoStructure) {
         try {
-            logger.debug("Analyzing file: {} (language: {})", filePath, language);
+            logger.debug("Analyzing file: {} (language: {}, with context: {})", 
+                filePath, language, repoStructure != null);
             logger.debug("Calling endpoint: {}", auditUrl);
             
-            // Create OpenAI-compatible request with model field
-            HuggingFaceAuditRequest request = HuggingFaceAuditRequest.forCode(code, language);
+            // Create OpenAI-compatible request with optional repo context
+            HuggingFaceAuditRequest request = repoStructure != null 
+                ? HuggingFaceAuditRequest.forCodeWithContext(code, language, filePath, repoStructure)
+                : HuggingFaceAuditRequest.forCode(code, language);
             
             // Call OpenAI-compatible endpoint
             HuggingFaceAuditResponse response = restClient.post()

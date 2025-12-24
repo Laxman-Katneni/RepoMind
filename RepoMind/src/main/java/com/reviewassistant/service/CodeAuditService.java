@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.reviewassistant.controller.dto.AuditNotification;
 import com.reviewassistant.model.AuditFinding;
 import com.reviewassistant.model.CodeAudit;
+import com.reviewassistant.model.CodeChunk;
 import com.reviewassistant.model.Repository;
 import com.reviewassistant.repository.AuditFindingRepository;
 import com.reviewassistant.repository.CodeAuditRepository;
@@ -26,17 +27,32 @@ public class CodeAuditService {
 
     private static final Logger logger = LoggerFactory.getLogger(CodeAuditService.class);
 
+    // Performance optimization constants
+    private static final int MAX_FILE_SIZE_KB = 100; // Skip files larger than 100KB
+    private static final int MAX_FILES_PER_AUDIT = 50; // Limit total files analyzed
+    private static final int PARALLEL_BATCH_SIZE = 5; // Process 5 files in parallel
+
     // Directories and files to skip (blocklist)
     private static final Set<String> SKIP_DIRECTORIES = Set.of(
         "node_modules", "target", ".git", "build", "dist", ".idea",
-        "coverage", ".vscode", "__pycache__", "vendor", ".gradle"
+        "coverage", ".vscode", "__pycache__", "vendor", ".gradle",
+        "test", "tests", "__tests__", "spec", "specs", // Skip test directories
+        "docs", "documentation", "examples" // Skip documentation
+    );
+
+    // High priority folders (analyze first) - language-agnostic
+    private static final Set<String> HIGH_PRIORITY_FOLDERS = Set.of(
+        "src", "lib", "app", "services", "service", 
+        "controllers", "controller", "models", "model",
+        "api", "routes", "handlers", "core"
     );
 
     // File extensions to audit (expanded to include config files)
     private static final Set<String> AUDITABLE_EXTENSIONS = Set.of(
         ".java", ".py", ".js", ".ts", ".tsx", ".jsx",
         ".html", ".css", ".xml", ".properties", 
-        ".yml", ".yaml", ".sql", ".json", ".md"
+        ".yml", ".yaml", ".sql", ".json", ".md",
+        ".go", ".rs", ".rb", ".php", ".c", ".cpp", ".h"
     );
 
     private final CodeAuditRepository codeAuditRepository;
@@ -46,6 +62,7 @@ public class CodeAuditService {
     private final GithubService githubService;
     private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
+    private final RagService ragService;
 
     public CodeAuditService(
             CodeAuditRepository codeAuditRepository,
@@ -54,7 +71,8 @@ public class CodeAuditService {
             HuggingFaceAuditService huggingFaceAuditService,
             GithubService githubService,
             ObjectMapper objectMapper,
-            SimpMessagingTemplate messagingTemplate) {
+            SimpMessagingTemplate messagingTemplate,
+            RagService ragService) {
         this.codeAuditRepository = codeAuditRepository;
         this.auditFindingRepository = auditFindingRepository;
         this.repositoryRepository = repositoryRepository;
@@ -62,6 +80,7 @@ public class CodeAuditService {
         this.githubService = githubService;
         this.objectMapper = objectMapper;
         this.messagingTemplate = messagingTemplate;
+        this.ragService = ragService;
     }
 
     /**
@@ -88,8 +107,8 @@ public class CodeAuditService {
     }
 
     /**
-     * Asynchronously processes the audit.
-     * SEQUENTIAL processing to avoid overwhelming free-tier HF API.
+     * Asynchronously processes the audit with PARALLEL batch processing.
+     * Includes repo structure context for better architectural insights.
      */
     @Async
     @Transactional
@@ -104,76 +123,115 @@ public class CodeAuditService {
             logger.info("Processing audit {} for {}/{}", 
                 auditId, repository.getOwner(), repository.getName());
 
-            // Fetch files from GitHub
-            List<String> filePaths = githubService.getRepositoryFilePaths(
+            // Fetch all files from GitHub
+            List<String> allFilePaths = githubService.getRepositoryFilePaths(
                 repository.getOwner(),
                 repository.getName(),
                 accessToken
             );
 
-            // Filter files: only src directory, skip test files
-            List<String> auditableFiles = filterAuditableFiles(filePaths);
+            logger.info("Fetched {} total files from repository", allFilePaths.size());
+
+            // Filter, prioritize, and limit files
+            List<String> auditableFiles = filterAndPrioritizeFiles(allFilePaths);
             
-            logger.info("Found {} auditable files in repository", auditableFiles.size());
+            logger.info("Selected {} files for audit (from {} total)", 
+                auditableFiles.size(), allFilePaths.size());
+
             audit.setTotalFilesScanned(0);
             codeAuditRepository.save(audit);
 
+            int totalFiles = auditableFiles.size();
             int processed = 0;
             int failedCount = 0;
 
-            // SEQUENTIAL processing (one file at a time)
-            for (String filePath : auditableFiles) {
-                try {
+            // PARALLEL BATCH PROCESSING with RAG context
+            for (int i = 0; i < totalFiles; i += PARALLEL_BATCH_SIZE) {
+                int endIndex = Math.min(i + PARALLEL_BATCH_SIZE, totalFiles);
+                List<String> batch = auditableFiles.subList(i, endIndex);
+                
+                logger.info("Processing batch {}-{} of {}", i+1, endIndex, totalFiles);
+
+                // Process batch in parallel
+                List<FileScanResult> batchResults = batch.parallelStream()
+                    .map(filePath -> {
+                        try {
+                            logger.debug("Scanning file: {}", filePath);
+
+                            // Fetch file content
+                            String content = githubService.getFileContent(
+                                repository.getOwner(),
+                                repository.getName(),
+                                filePath,
+                                accessToken
+                            );
+
+                            // Check file size
+                            if (content.length() > MAX_FILE_SIZE_KB * 1024) {
+                                logger.warn("Skipping large file: {} ({} KB)", 
+                                    filePath, content.length() / 1024);
+                                return new FileScanResult(filePath, null, "File too large", true);
+                            }
+
+                            // Detect language
+                            String language = detectLanguage(filePath);
+
+                            // Build RAG query from file content + path
+                            String ragQuery = buildRagQuery(content, filePath, language);
+                            
+                            // Retrieve relevant code chunks using RAG
+                            String relevantContext = retrieveRelevantContext(
+                                ragQuery, 
+                                repository.getId()
+                            );
+
+                            // Analyze with HF model (with intelligent RAG context)
+                            AuditResult result = huggingFaceAuditService.analyzeCodeWithContext(
+                                content, language, filePath, relevantContext
+                            );
+
+                            return new FileScanResult(filePath, result, null, false);
+
+                        } catch (Exception e) {
+                            logger.error("Failed to scan {}: {}", filePath, e.getMessage());
+                            return new FileScanResult(filePath, null, e.getMessage(), true);
+                        }
+                    })
+                    .toList();
+
+                // Save results from batch
+                for (FileScanResult scanResult : batchResults) {
                     processed++;
                     
                     // Update progress
-                    audit.updateProgress(processed, auditableFiles.size(), filePath);
-                    codeAuditRepository.save(audit);
-
-                    logger.debug("Auditing file {}/{}: {}", processed, auditableFiles.size(), filePath);
-
-                    // Fetch file content
-                    String content = githubService.getFileContent(
-                        repository.getOwner(),
-                        repository.getName(),
-                        filePath,
-                        accessToken
-                    );
-
-                    // Detect language
-                    String language = detectLanguage(filePath);
-
-                    // Analyze with HF model
-                    AuditResult result = huggingFaceAuditService.analyzeCode(content, language, filePath);
-
-                    if (result != null) {
-                        // Save finding
-                        saveFinding(audit, filePath, content, result);
-                        audit.incrementCounts(result.severity());
-                        audit.setTotalFilesScanned(audit.getTotalFilesScanned() + 1);
-                        
-                        if (audit.getFilesWithIssues() == null) {
-                            audit.setFilesWithIssues(0);
+                    audit.updateProgress(processed, totalFiles, scanResult.filePath);
+                    
+                    if (scanResult.success) {
+                        if (scanResult.result != null) {
+                            // Save finding
+                            saveFinding(audit, scanResult.filePath, "", scanResult.result);
+                            audit.incrementCounts(scanResult.result.severity());
+                            audit.setTotalFilesScanned(audit.getTotalFilesScanned() + 1);
+                            
+                            if (audit.getFilesWithIssues() == null) {
+                                audit.setFilesWithIssues(0);
+                            }
+                            audit.setFilesWithIssues(audit.getFilesWithIssues() + 1);
                         }
-                        audit.setFilesWithIssues(audit.getFilesWithIssues() + 1);
                     } else {
-                        logger.warn("No audit result for file: {}", filePath);
+                        logger.warn("Scan failed for {}: {}", scanResult.filePath, scanResult.error);
                         failedCount++;
                     }
-
-                    // Save progress
-                    codeAuditRepository.save(audit);
-
-                } catch (Exception e) {
-                    logger.error("Failed to audit file {}: {}", filePath, e.getMessage());
-                    failedCount++;
                 }
+
+                // Save progress after each batch
+                codeAuditRepository.save(audit);
             }
 
             // Mark as completed
             if (failedCount == 0) {
                 audit.markCompleted();
-            } else if (failedCount < auditableFiles.size()) {
+            } else if (failedCount < totalFiles) {
                 audit.setStatus(CodeAudit.AuditStatus.PARTIALLY_COMPLETED);
                 audit.setCompletedAt(LocalDateTime.now());
                 audit.setErrorMessage(failedCount + " files failed to analyze");
@@ -197,6 +255,16 @@ public class CodeAuditService {
             sendAuditFailedNotification(audit);
         }
     }
+
+    /**
+     * Helper record for file scan results
+     */
+    private record FileScanResult(
+        String filePath,
+        AuditResult result,
+        String error,
+        boolean success
+    ) {}
 
     /**
      * Sends WebSocket notification when audit completes successfully.
@@ -233,35 +301,234 @@ public class CodeAuditService {
     }
 
     /**
-     * Filters files using blocklist strategy - excludes bad directories, accepts valid extensions.
-     * No longer requires files to be in src/ directory.
+     * Builds an intelligent RAG query from file content.
+     * Extracts imports, class names, and key patterns to find relevant context.
      */
-    private List<String> filterAuditableFiles(List<String> allFiles) {
-        List<String> filtered = new ArrayList<>();
-
-        for (String filePath : allFiles) {
-            boolean isAuditable = isAuditableFile(filePath);
-            
-            // Debug logging as requested
-            logger.debug("File assessment: {} -> {}", filePath, isAuditable);
-            
-            if (isAuditable) {
-                filtered.add(filePath);
-            }
+    private String buildRagQuery(String fileContent, String filePath, String language) {
+        StringBuilder query = new StringBuilder();
+        
+        // Add file name and path context
+        String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+        query.append(fileName).append(" ");
+        
+        // Extract imports and dependencies
+        List<String> imports = extractImports(fileContent, language);
+        if (!imports.isEmpty()) {
+            query.append("imports: ").append(String.join(" ", imports)).append(" ");
         }
-
-        logger.info("Filtered {} auditable files from {} total files", filtered.size(), allFiles.size());
-        return filtered;
+        
+        // Extract class/interface names
+        String className = extractClassName(fileContent, language);
+        if (className != null) {
+            query.append("class: ").append(className).append(" ");
+        }
+        
+        // Add language-specific keywords
+        query.append(language).append(" ");
+        
+        // Add architectural keywords based on file location  
+        if (filePath.contains("controller") || filePath.contains("Controller")) {
+            query.append("API endpoint HTTP request response ");
+        } else if (filePath.contains("service") || filePath.contains("Service")) {
+            query.append("business logic service layer ");
+        } else if (filePath.contains("repository") || filePath.contains("Repository")) {
+            query.append("database query persistence ");
+        } else if (filePath.contains("model") || filePath.contains("entity")) {
+            query.append("data model entity schema ");
+        }
+        
+        return query.toString().trim();
     }
 
     /**
-     * Determines if a file should be audited using blocklist + extension strategy.
-     * Step A: Check blocklist
-     * Step B: Check valid extension
-     * Step C: No src/ requirement (removed)
+     * Extracts import statements from code to understand dependencies.
+     */
+    private List<String> extractImports(String content, String language) {
+        List<String> imports = new ArrayList<>();
+        
+        try {
+            String[] lines = content.split("\n");
+            for (String line : lines) {
+                line = line.trim();
+                
+                // Java/TypeScript imports
+                if (language.equals("Java") || language.equals("TypeScript")) {
+                    if (line.startsWith("import ") && !line.contains("*")) {
+                        String imported = line.replace("import ", "")
+                                             .replace(";", "")
+                                             .trim();
+                        if (imported.contains(".")) {
+                            String className = imported.substring(imported.lastIndexOf('.') + 1);
+                            imports.add(className);
+                        }
+                    }
+                }
+                // Python imports
+                else if (language.equals("Python")) {
+                    if (line.startsWith("from ") || line.startsWith("import ")) {
+                        String[] parts = line.split(" ");
+                        for (String part : parts) {
+                            if (!part.equals("from") && !part.equals("import") && 
+                                !part.equals("as") && !part.contains(".")) {
+                                imports.add(part.replace(",", ""));
+                            }
+                        }
+                    }
+                }
+                
+                // Limit to first 20 imports to keep query concise
+                if (imports.size() >= 20) break;
+            }
+        } catch (Exception e) {
+            logger.debug("Error extracting imports: {}", e.getMessage());
+        }
+        
+        return imports;
+    }
+
+    /**
+     * Extracts class name from code content.
+     */
+    private String extractClassName(String content, String language) {
+        try {
+            String[] lines = content.split("\n");
+            for (String line : lines) {
+                line = line.trim();
+                
+                // Java/TypeScript class
+                if (language.equals("Java") || language.equals("TypeScript")) {
+                    if (line.contains("class ") || line.contains("interface ")) {
+                        String[] parts = line.split("\\s+");
+                        for (int i = 0; i < parts.length - 1; i++) {
+                            if (parts[i].equals("class") || parts[i].equals("interface")) {
+                                return parts[i + 1].replace("{", "").trim();
+                            }
+                        }
+                    }
+                }
+                // Python class
+                else if (language.equals("Python")) {
+                    if (line.startsWith("class ")) {
+                        return line.replace("class ", "")
+                                  .split("[:\\(]")[0]
+                                  .trim();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Error extracting class name: {}", e.getMessage());
+        }
+        
+        return null;
+    }
+
+    /**
+     * Retrieves relevant code context using RAG semantic search.
+     * Returns formatted context string with related code chunks.
+     */
+    private String retrieveRelevantContext(String query, Long repositoryId) {
+        try {
+            // Retrieve similar code chunks
+            List<CodeChunk> chunks = ragService.retrieve(query, repositoryId);
+            
+            if (chunks.isEmpty()) {
+                return "No related code found in repository.";
+            }
+            
+            StringBuilder context = new StringBuilder();
+            context.append("Related code in repository:\n\n");
+            
+            for (int i = 0; i < chunks.size(); i++) {
+                CodeChunk chunk = chunks.get(i);
+                context.append(String.format("// %s (lines %d-%d)\n",
+                    chunk.getFilePath(),
+                    chunk.getStartLine(),
+                    chunk.getEndLine()));
+                
+                // Truncate very long chunks
+                String chunkContent = chunk.getContent();
+                if (chunkContent.length() > 500) {
+                    chunkContent = chunkContent.substring(0, 500) + "\n// ... (truncated)";
+                }
+                
+                context.append(chunkContent);
+                context.append("\n\n");
+                
+                // Limit context to avoid token overflow
+                if (context.length() > 2000) {
+                    context.append("// ... (more related code available)");
+                    break;
+                }
+            }
+            
+            return context.toString();
+            
+        } catch (Exception e) {
+            logger.error("Error retrieving RAG context: {}", e.getMessage());
+            return "Error retrieving related code context.";
+        }
+    }
+
+    /**
+     * Filters, prioritizes, and limits files for audit.
+     * Uses language-agnostic folder patterns for prioritization.
+     */
+    private List<String> filterAndPrioritizeFiles(List<String> allFiles) {
+        // Step 1: Filter auditable files
+        List<String> filtered = allFiles.stream()
+            .filter(this::isAuditableFile)
+            .toList();
+
+        logger.info("Filtered {} auditable files from {} total", filtered.size(), allFiles.size());
+
+        // Step 2: Prioritize by folder patterns
+        List<String> highPriority = new ArrayList<>();
+        List<String> normalPriority = new ArrayList<>();
+
+        for (String file : filtered) {
+            if (isHighPriorityFile(file)) {
+                highPriority.add(file);
+            } else {
+                normalPriority.add(file);
+            }
+        }
+
+        logger.info("Prioritized: {} high priority, {} normal priority", 
+            highPriority.size(), normalPriority.size());
+
+        // Step 3: Combine and limit total files
+        List<String> result = new ArrayList<>();
+        result.addAll(highPriority);
+       
+        int remaining = MAX_FILES_PER_AUDIT - result.size();
+        if (remaining > 0 && !normalPriority.isEmpty()) {
+            result.addAll(normalPriority.subList(0, Math.min(remaining, normalPriority.size())));
+        }
+
+        // Limit to MAX_FILES_PER_AUDIT
+        if (result.size() > MAX_FILES_PER_AUDIT) {
+            result = result.subList(0, MAX_FILES_PER_AUDIT);
+        }
+
+        logger.info("Final selection: {} files (max: {})", result.size(), MAX_FILES_PER_AUDIT);
+        return result;
+    }
+
+    /**
+     * Checks if file is in high-priority folder (language-agnostic).
+     */
+    private boolean isHighPriorityFile(String filePath) {
+        String lowerPath = filePath.toLowerCase();
+        return HIGH_PRIORITY_FOLDERS.stream()
+            .anyMatch(folder -> lowerPath.contains("/" + folder + "/") || 
+                               lowerPath.startsWith(folder + "/"));
+    }
+
+    /**
+     * Determines if a file should be auditable using blocklist + extension strategy.
      */
     private boolean isAuditableFile(String filePath) {
-        // Step A: Blocklist - skip bad directories
+        // Blocklist - skip bad directories
         for (String dir : SKIP_DIRECTORIES) {
             if (filePath.contains("/" + dir + "/") || filePath.contains("\\" + dir + "\\") ||
                 filePath.startsWith(dir + "/") || filePath.startsWith(dir + "\\")) {
@@ -269,14 +536,13 @@ public class CodeAuditService {
             }
         }
 
-        // Step B: Extension check - must end with supported extension
+        // Extension check - must end with supported extension
         for (String ext : AUDITABLE_EXTENSIONS) {
             if (filePath.endsWith(ext)) {
                 return true;
             }
         }
 
-        // Step C: If no valid extension, reject
         return false;
     }
 

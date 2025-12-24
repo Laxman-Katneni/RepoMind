@@ -1,0 +1,15 @@
+target/
+!target/*.jar
+.git
+.gitignore
+*.md
+.env
+.DS_Store
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+*.log
+.idea/
+.vscode/
+*.iml

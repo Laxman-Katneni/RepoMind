@@ -7,7 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,20 +18,40 @@ public class AuthController {
     
     private final UserGithubTokenRepository tokenRepository;
     private final JwtUtil jwtUtil;
+    private final OAuth2AuthorizedClientService authorizedClientService;
     
     @Value("${FRONTEND_URL:http://localhost:5173}")
     private String frontendUrl;
     
-    public AuthController(UserGithubTokenRepository tokenRepository, JwtUtil jwtUtil) {
+    public AuthController(
+            UserGithubTokenRepository tokenRepository, 
+            JwtUtil jwtUtil,
+            OAuth2AuthorizedClientService authorizedClientService) {
         this.tokenRepository = tokenRepository;
         this.jwtUtil = jwtUtil;
+        this.authorizedClientService = authorizedClientService;
     }
     
     @GetMapping("/auth/callback")
     public void authCallback(
-            @RegisteredOAuth2AuthorizedClient("github") OAuth2AuthorizedClient authorizedClient,
-            @AuthenticationPrincipal OAuth2User oauth2User,
+            OAuth2AuthenticationToken authentication,
             HttpServletResponse response) throws Exception {
+        
+        // Get OAuth2User from authentication
+        OAuth2User oauth2User = authentication.getPrincipal();
+        
+        // Get the authorized client to extract access token
+        OAuth2AuthorizedClient authorizedClient = authorizedClientService
+                .loadAuthorizedClient(
+                        authentication.getAuthorizedClientRegistrationId(),
+                        authentication.getName()
+                );
+        
+        if (authorizedClient == null) {
+            System.err.println("ERROR: No authorized client found!");
+            response.sendRedirect(frontendUrl + "/login?error=oauth");
+            return;
+        }
         
         // Extract user info from GitHub OAuth
         Long githubId = oauth2User.getAttribute("id");

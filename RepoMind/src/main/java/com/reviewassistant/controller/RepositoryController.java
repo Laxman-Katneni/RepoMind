@@ -132,22 +132,25 @@ public class RepositoryController {
     }
     
     /**
-     * Manually sync pull requests from GitHub for a repository.
-     * Useful for populating data without webhooks during local development.
+     * Sync pull requests from GitHub for a repository.
+     * Fetches latest PRs and stores them in database.
      * 
      * @param id Repository database ID
-     * @param authorizedClient OAuth2 authorized client from session
+     * @param authentication Spring Security authentication (JWT)
      * @return Success message with count of synced PRs
      */
     @PostMapping("/{id}/sync")
     public ResponseEntity<Map<String, Object>> syncRepository(
             @PathVariable Long id,
-            @RegisteredOAuth2AuthorizedClient("github") OAuth2AuthorizedClient authorizedClient) {
+            Authentication authentication) {
         
         logger.info("Syncing pull requests for repository ID: {}", id);
         
-        // Extract token from OAuth2 session
-        String token = authorizedClient.getAccessToken().getTokenValue();
+        // Fetch GitHub token from database using JWT
+        Long githubId = (Long) authentication.getDetails();
+        UserGithubToken userToken = tokenRepository.findByGithubId(githubId)
+                .orElseThrow(() -> new RuntimeException("GitHub token not found for user"));
+        String token = userToken.getAccessToken();
         
         List<PullRequest> syncedPrs = githubService.syncPullRequests(id, token);
         
@@ -184,37 +187,35 @@ public class RepositoryController {
      * This enables the chat feature to answer questions about the codebase.
      * 
      * @param repoId Repository database ID
-     * @param authorizedClient OAuth2 authorized client from session
+     * @param authentication Spring Security authentication (JWT)
      * @return Success message
      */
     @PostMapping("/{repoId}/index")
     public ResponseEntity<Map<String, String>> indexRepository(
             @PathVariable Long repoId,
-            @RegisteredOAuth2AuthorizedClient("github") OAuth2AuthorizedClient authorizedClient) {
+            Authentication authentication) {
         
         logger.info("Starting indexing for repository {}", repoId);
         
-        // Extract token from OAuth2 session
-        String token = authorizedClient.getAccessToken().getTokenValue();
+        // Fetch GitHub token from database using JWT
+        Long githubId = (Long) authentication.getDetails();
+        UserGithubToken userToken = tokenRepository.findByGithubId(githubId)
+                .orElseThrow(() -> new RuntimeException("GitHub token not found for user"));
+        String token = userToken.getAccessToken();
         
         try {
-            // Trigger repository indexing
             ragService.indexRepository(repoId, token);
             
-            logger.info("Successfully indexed repository {}", repoId);
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Repository indexing started successfully");
+            response.put("repositoryId", String.valueOf(repoId));
             
-            return ResponseEntity.ok(Map.of(
-                    "status", "success",
-                    "message", "Repository indexed successfully. You can now chat about the code!"
-            ));
+            logger.info("Indexing completed for repository {}", repoId);
             
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            logger.error("Failed to index repository {}: {}", repoId, e.getMessage(), e);
-            
-            return ResponseEntity.status(500).body(Map.of(
-                    "status", "error",
-                    "message", "Failed to index repository: " + e.getMessage()
-            ));
+            logger.error("Error indexing repository {}", repoId, e);
+            throw new RuntimeException("Failed to index repository: " + e.getMessage(), e);
         }
     }
 }

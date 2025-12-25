@@ -41,6 +41,11 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
+                // Use cookie-based storage for authorization requests instead of session
+                // This fixes issues with multiple backend instances on Render
+                .authorizationEndpoint(authorization -> authorization
+                    .authorizationRequestRepository(cookieAuthorizationRequestRepository())
+                )
                 .defaultSuccessUrl("/auth/success", true)
                 .failureHandler((request, response, exception) -> {
                     // Log the OAuth failure for debugging
@@ -97,5 +102,17 @@ public class SecurityConfig {
     @Bean
     public CookieSameSiteSupplier cookieSameSiteSupplier() {
         return CookieSameSiteSupplier.ofNone();
+    }
+
+    /**
+     * Use cookie-based storage for OAuth2 authorization requests.
+     * This prevents "authorization_request_not_found" errors when running multiple instances
+     * since the authorization request is stored in a cookie, not server-side session.
+     */
+    @Bean
+    public org.springframework.security.oauth2.client.web.AuthorizationRequestRepository<org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest> cookieAuthorizationRequestRepository() {
+        // Using cookie-based repository instead of HttpSession-based
+        // This stores the OAuth state in a cookie, making it available across all backend instances
+        return new org.springframework.security.oauth2.client.web.HttpCookieOAuth2AuthorizationRequestRepository();
     }
 }

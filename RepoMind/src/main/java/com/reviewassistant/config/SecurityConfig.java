@@ -35,7 +35,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
-                .defaultSuccessUrl("http://localhost:5173/app/select-repo", true)
+                .defaultSuccessUrl(System.getenv().getOrDefault("FRONTEND_URL", "http://localhost:5173") + "/app/select-repo", true)
                 .failureUrl("/login?error=true")
             )
             .csrf(csrf -> csrf
@@ -54,8 +54,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Allow frontend origin
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        // Allow frontend origin (localhost for dev, Render URL for production)
+        String frontendUrl = System.getenv().getOrDefault("FRONTEND_URL", "http://localhost:5173");
+        configuration.setAllowedOrigins(List.of("http://localhost:5173", frontendUrl));
         
         // Allow common HTTP methods
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));

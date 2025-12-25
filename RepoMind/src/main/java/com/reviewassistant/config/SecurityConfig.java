@@ -35,7 +35,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
-                .defaultSuccessUrl(System.getenv().getOrDefault("FRONTEND_URL", "http://localhost:5173") + "/app/select-repo", true)
+                .defaultSuccessUrl("/auth/success", true)
                 .failureUrl("/login?error=true")
             )
             .csrf(csrf -> csrf

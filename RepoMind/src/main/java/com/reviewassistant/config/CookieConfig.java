@@ -31,9 +31,7 @@ public class CookieConfig implements ServletContextInitializer {
             System.out.println("Session cookie domain not set (using default)");
         }
         
-        // Cookie settings from application.properties will still apply
-        sessionCookieConfig.setSecure(true);  // HTTPS only
-        sessionCookieConfig.setHttpOnly(true);  // Prevent XSS
-        sessionCookieConfig.setPath("/");
+        // Note: Secure, HttpOnly, and SameSite are configured in application.properties
+        // to avoid conflicts and ensure proper ordering
     }
 }

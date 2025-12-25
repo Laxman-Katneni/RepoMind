@@ -33,6 +33,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/webhooks/**").permitAll()
                 .requestMatchers("/login", "/error").permitAll()
                 
+                // OAuth2 endpoints - must be public to initiate login
+                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                
                 // Protected routes - authentication required
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().authenticated()

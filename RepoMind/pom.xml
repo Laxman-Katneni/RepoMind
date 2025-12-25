@@ -138,10 +138,23 @@
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
         
-        <!-- Spring Session JDBC for persistent sessions across instances -->
+        <!-- JWT for stateless authentication -->
         <dependency>
-            <groupId>org.springframework.session</groupId>
-            <artifactId>spring-session-jdbc</artifactId>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.3</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.3</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.3</version>
+            <scope>runtime</scope>
         </dependency>
         
         <!-- Spring Boot Starter Test -->

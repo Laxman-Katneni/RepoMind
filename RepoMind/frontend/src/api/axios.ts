@@ -2,15 +2,19 @@ import axios from 'axios'
 
 /**
  * Configured axios instance for API calls.
- * Uses cookies for authentication instead of Bearer tokens.
- * 
- * IMPORTANT: baseURL is empty so requests go through the frontend proxy (server.js)
- * The proxy forwards /api, /auth, and /oauth2 requests to the backend API.
- * This ensures all requests appear to come from the same origin, allowing cookie sharing.
+ * Calls backend directly with JWT authentication.
  */
 const api = axios.create({
-  baseURL: '',  // Empty = use same origin, proxy handles routing to backend
-  withCredentials: true  // CRITICAL: Sends JSESSIONID cookie with every request
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+})
+
+// Add JWT token to every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('jwt_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 export default api

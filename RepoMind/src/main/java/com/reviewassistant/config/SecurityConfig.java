@@ -1,91 +1,75 @@
 package com.reviewassistant.config;
 
+import com.reviewassistant.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.http.HttpStatus;
-import org.springframework.boot.web.servlet.server.CookieSameSiteSupplier;
 
 import java.util.List;
 
 /**
- * Security configuration for GitHub OAuth2 authentication.
- * Configures public and protected routes, enables OAuth2 login flow.
- * Uses cookie-based session authentication instead of tokens.
+ * Security configuration for JWT-based stateless authentication with GitHub OAuth2.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+    
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless JWT
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // No sessions!
+            )
             .authorizeHttpRequests(authorize -> authorize
-                // Public routes - no authentication required
+                // Public routes
                 .requestMatchers("/", "/index.html", "/assets/**").permitAll()
                 .requestMatchers("/api/webhooks/**").permitAll()
                 .requestMatchers("/login", "/error").permitAll()
                 
-                // OAuth2 endpoints - must be public to initiate login
+                // OAuth2 endpoints must be public
                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                .requestMatchers("/auth/**").permitAll()
                 
-                // Protected routes - authentication required
+                // All API routes require JWT authentication
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
-                // Use session-based storage (now backed by Postgres via Spring Session JDBC)
-                .authorizationEndpoint(authorization -> authorization
-                    .authorizationRequestRepository(authorizationRequestRepository())
-                )
-                .defaultSuccessUrl("/auth/success", true)
-                .failureHandler((request, response, exception) -> {
-                    // Log the OAuth failure for debugging
-                    System.err.println("OAuth Login Failed: " + exception.getMessage());
-                    exception.printStackTrace();
-                    
-                    // Redirect to frontend with error
-                    String frontendUrl = System.getenv().getOrDefault("FRONTEND_URL", "http://localhost:5173");
-                    response.sendRedirect(frontendUrl + "/login?error=oauth");
-                })
+                .defaultSuccessUrl("/auth/callback", true)
             )
-            .csrf(csrf -> csrf
-                // Disable CSRF for API endpoints (frontend uses cookie-based auth)
-                .ignoringRequestMatchers("/api/**")
-            )
-            .exceptionHandling(e -> e
-                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-            );
+            // Add JWT filter before UsernamePasswordAuthenticationFilter
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    /**
-     * CORS configuration to allow frontend origin with credentials.
-     * Critical for cookie-based authentication to work across origins.
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Allow frontend origin (localhost for dev, Render URL for production)
-        String frontendUrl = System.getenv().getOrDefault("FRONTEND_URL", "http://localhost:5173");
-        configuration.setAllowedOrigins(List.of("http://localhost:5173", frontendUrl));
+        // Allow frontend to call backend directly (no proxy)
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:5173",
+            "https://repomind-app.onrender.com"
+        ));
         
-        // Allow common HTTP methods
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        
-        // Allow all headers
         configuration.setAllowedHeaders(List.of("*"));
-        
-        // CRITICAL: Allow credentials (cookies) to be sent
         configuration.setAllowCredentials(true);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -93,14 +77,4 @@ public class SecurityConfig {
         
         return source;
     }
-
-    /**
-     * Authorization request repository for OAuth flow.
-     * Uses session storage (now backed by Postgres via Spring Session JDBC).
-     */
-    @Bean
-    public org.springframework.security.oauth2.client.web.AuthorizationRequestRepository<org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest> authorizationRequestRepository() {
-        return new org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository();
-    }
 }
-

@@ -1,16 +1,17 @@
 package com.reviewassistant.controller;
 
 import com.reviewassistant.model.Repository;
+import com.reviewassistant.model.UserGithubToken;
 import com.reviewassistant.repository.PullRequestRepository;
 import com.reviewassistant.repository.ReviewCommentRepository;
 import com.reviewassistant.repository.ReviewRunRepository;
+import com.reviewassistant.repository.UserGithubTokenRepository;
 import com.reviewassistant.service.GithubService;
 import com.reviewassistant.service.dto.DashboardMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -35,14 +36,17 @@ public class RepositoryController {
     private final ReviewCommentRepository reviewCommentRepository;
     private final PullRequestRepository pullRequestRepository;
     private final com.reviewassistant.service.RagService ragService;
+    private final UserGithubTokenRepository tokenRepository;
     
     public RepositoryController(
             GithubService githubService,
             ReviewRunRepository reviewRunRepository,
             ReviewCommentRepository reviewCommentRepository,
             PullRequestRepository pullRequestRepository,
-            com.reviewassistant.service.RagService ragService) {
+            com.reviewassistant.service.RagService ragService,
+            UserGithubTokenRepository tokenRepository) {
         this.githubService = githubService;
+        this.tokenRepository = tokenRepository;
         this.reviewRunRepository = reviewRunRepository;
         this.reviewCommentRepository = reviewCommentRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -51,19 +55,25 @@ public class RepositoryController {
     
     /**
      * Get all repositories for the authenticated user.
-     * Token is extracted from OAuth2 session instead of Authorization header.
+     * Uses JWT authentication - extracts user info from JWT and retrieves GitHub token from database.
      * 
-     * @param authorizedClient OAuth2 authorized client from session
+     * @param authentication Spring Security authentication (populated by JwtAuthenticationFilter)
      * @return List of repositories
      */
     @GetMapping
     public ResponseEntity<List<Repository>> getUserRepositories(
-            @RegisteredOAuth2AuthorizedClient("github") OAuth2AuthorizedClient authorizedClient) {
+            org.springframework.security.core.Authentication authentication) {
         
-        logger.info("Fetching repositories for authenticated user");
+        String username = authentication.getName();
+        Long githubId = (Long) authentication.getDetails();
         
-        // Extract token from OAuth2 session
-        String token = authorizedClient.getAccessToken().getTokenValue();
+        logger.info("Fetching repositories for user: {} (GitHub ID: {})", username, githubId);
+        
+        // Fetch GitHub token from database
+        UserGithubToken userToken = tokenRepository.findByGithubId(githubId)
+                .orElseThrow(() -> new RuntimeException("GitHub token not found for user"));
+        
+        String token = userToken.getAccessToken();
         
         List<Repository> repositories = githubService.fetchUserRepositories(token);
         

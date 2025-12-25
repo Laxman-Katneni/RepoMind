@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
+import AuthCallback from './pages/AuthCallback'
 import RepoSelection from './pages/RepoSelection'
 import Dashboard from './pages/Dashboard'
 import Chat from './pages/Chat'
@@ -25,6 +26,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/app/select-repo" element={<RepoSelection />} />
         <Route path="/app" element={<Dashboard />} />
         <Route path="/app/pull-requests" element={<PullRequestList />} />

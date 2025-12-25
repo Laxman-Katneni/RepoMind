@@ -2,9 +2,9 @@ import { Github } from 'lucide-react'
 
 export default function Login() {
   const handleGitHubLogin = () => {
-    // Redirect to OAuth endpoint through the frontend proxy
-    // The proxy (server.js) will forward this to the backend
-    window.location.href = '/oauth2/authorization/github'
+    // Redirect directly to backend OAuth endpoint (no proxy!)
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+    window.location.href = `${backendUrl}/oauth2/authorization/github`
   }
 
   return (

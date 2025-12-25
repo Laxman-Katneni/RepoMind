@@ -4,7 +4,8 @@ export default function Login() {
   const handleGitHubLogin = () => {
     // Redirect to backend OAuth endpoint
     // Backend will handle OAuth flow and redirect back to frontend with session cookie
-    window.location.href = 'http://localhost:8080/oauth2/authorization/github'
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+    window.location.href = `${apiUrl}/oauth2/authorization/github`
   }
 
   return (

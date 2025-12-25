@@ -8,6 +8,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 
@@ -41,6 +43,9 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 // Disable CSRF for API endpoints (frontend uses cookie-based auth)
                 .ignoringRequestMatchers("/api/**")
+            )
+            .exceptionHandling(e -> e
+                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
             );
 
         return http.build();

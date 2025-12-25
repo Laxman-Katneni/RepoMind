@@ -41,10 +41,9 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
-                // Use cookie-based storage for authorization requests instead of session
-                // This fixes issues with multiple backend instances on Render
+                // Use session-based storage (now backed by Postgres via Spring Session JDBC)
                 .authorizationEndpoint(authorization -> authorization
-                    .authorizationRequestRepository(cookieAuthorizationRequestRepository())
+                    .authorizationRequestRepository(authorizationRequestRepository())
                 )
                 .defaultSuccessUrl("/auth/success", true)
                 .failureHandler((request, response, exception) -> {
@@ -96,20 +95,11 @@ public class SecurityConfig {
     }
 
     /**
-     * Configure session cookie for cross-subdomain sharing.
-     * Sets cookie domain to .onrender.com so cookies work across repomind-app and repomind-api.
-     */
-    @Bean
-    public CookieSameSiteSupplier cookieSameSiteSupplier() {
-        return CookieSameSiteSupplier.ofNone();
-    }
-
-    /**
      * Authorization request repository for OAuth flow.
-     * Using session-based storage.
+     * Uses session storage (now backed by Postgres via Spring Session JDBC).
      */
     @Bean
-    public org.springframework.security.oauth2.client.web.AuthorizationRequestRepository<org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest> cookieAuthorizationRequestRepository() {
+    public org.springframework.security.oauth2.client.web.AuthorizationRequestRepository<org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest> authorizationRequestRepository() {
         return new org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository();
     }
 }

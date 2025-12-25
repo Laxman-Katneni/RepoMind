@@ -138,6 +138,12 @@
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
         
+        <!-- Spring Session JDBC for persistent sessions across instances -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-jdbc</artifactId>
+        </dependency>
+        
         <!-- Spring Boot Starter Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -42,7 +42,15 @@ public class SecurityConfig {
             )
             .oauth2Login(oauth2 -> oauth2
                 .defaultSuccessUrl("/auth/success", true)
-                .failureUrl("/login?error=true")
+                .failureHandler((request, response, exception) -> {
+                    // Log the OAuth failure for debugging
+                    System.err.println("OAuth Login Failed: " + exception.getMessage());
+                    exception.printStackTrace();
+                    
+                    // Redirect to frontend with error
+                    String frontendUrl = System.getenv().getOrDefault("FRONTEND_URL", "http://localhost:5173");
+                    response.sendRedirect(frontendUrl + "/login?error=oauth");
+                })
             )
             .csrf(csrf -> csrf
                 // Disable CSRF for API endpoints (frontend uses cookie-based auth)

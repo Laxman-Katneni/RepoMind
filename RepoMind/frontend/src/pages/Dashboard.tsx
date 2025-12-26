@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import api from '../api/axios'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
-import { Shield, GitPullRequest, MessageSquare, AlertTriangle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, BarChart } from 'lucide-react'
+import { Shield, GitPullRequest, MessageSquare, AlertTriangle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, BarChart, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface DashboardMetrics {
@@ -493,49 +493,119 @@ export default function Dashboard() {
               />
             </div>
 
-              {/* Chart */}
-              <div className="bg-gray-900 rounded-3xl p-8 border border-gray-800 shadow-sm hover:shadow-xl transition-shadow duration-500 ease-out">
-                <h2 className="text-2xl font-semibold text-white mb-8">Latest Audit Breakdown</h2>
-                {latestAudit ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Critical', value: latestAudit.criticalCount || 0, color: '#ef4444' },
-                          { name: 'Warning', value: latestAudit.warningCount || 0, color: '#f59e0b' },
-                          { name: 'Info', value: latestAudit.infoCount || 0, color: '#3b82f6' }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
+              {/* Charts Section - 2 columns */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Pie Chart */}
+                <div className="bg-gray-900 rounded-3xl p-8 border border-gray-800 shadow-sm hover:shadow-xl transition-shadow duration-500 ease-out">
+                  <h2 className="text-2xl font-semibold text-white mb-8">Latest Audit Breakdown</h2>
+                  {latestAudit ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Critical', value: latestAudit.criticalCount || 0, color: '#ef4444' },
+                            { name: 'Warning', value: latestAudit.warningCount || 0, color: '#f59e0b' },
+                            { name: 'Info', value: latestAudit.infoCount || 0, color: '#3b82f6' }
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {[
+                            { name: 'Critical', value: latestAudit.criticalCount || 0, color: '#ef4444' },
+                            { name: 'Warning', value: latestAudit.warningCount || 0, color: '#f59e0b' },
+                            { name: 'Info', value: latestAudit.infoCount || 0, color: '#3b82f6' }
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '12px', color: '#fff' }}
+                        />
+                        <Legend 
+                          iconType="circle"
+                          wrapperStyle={{ color: '#9ca3af' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <Bug className="w-12 h-12 text-gray-600 mb-4" />
+                      <p className="text-gray-400 text-center">Run an audit to see issue breakdown</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Items Card */}
+                <div className="bg-gray-900 rounded-3xl p-8 border border-gray-800 shadow-sm hover:shadow-xl transition-shadow duration-500 ease-out">
+                  <h2 className="text-2xl font-semibold text-white mb-8">⚠️ Action Required</h2>
+                  {latestAudit ? (
+                    <div className="space-y-6">
+                      {/* Critical Issues */}
+                      {(latestAudit.criticalCount || 0) > 0 && (
+                        <div className="flex items-start gap-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                          <div className="flex-shrink-0 mt-1">
+                            <AlertTriangle className="w-6 h-6 text-red-500" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-red-400 mb-1">
+                              {latestAudit.criticalCount} Critical {latestAudit.criticalCount === 1 ? 'Issue' : 'Issues'}
+                            </h3>
+                            <p className="text-sm text-gray-400">Fix immediately - High security risk</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Warning Issues */}
+                      {(latestAudit.warningCount || 0) > 0 && (
+                        <div className="flex items-start gap-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                          <div className="flex-shrink-0 mt-1">
+                            <AlertTriangle className="w-6 h-6 text-yellow-500" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-yellow-400 mb-1">
+                              {latestAudit.warningCount} Warning {latestAudit.warningCount === 1 ? 'Issue' : 'Issues'}
+                            </h3>
+                            <p className="text-sm text-gray-400">Review soon - Code quality concerns</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Info Issues */}
+                      {(latestAudit.infoCount || 0) > 0 && (
+                        <div className="flex items-start gap-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                          <div className="flex-shrink-0 mt-1">
+                            <Bug className="w-6 h-6 text-blue-500" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-blue-400 mb-1">
+                              {latestAudit.infoCount} Info {latestAudit.infoCount === 1 ? 'Issue' : 'Issues'}
+                            </h3>
+                            <p className="text-sm text-gray-400">Low priority - Minor improvements</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* View All Button */}
+                      <button
+                        onClick={() => navigate(`/app/audit-results/${latestAudit.auditId}`)}
+                        className="w-full mt-4 px-6 py-3 bg-white text-gray-900 rounded-xl hover:bg-gray-100 transition font-semibold shadow-sm flex items-center justify-center gap-2"
                       >
-                        {[
-                          { name: 'Critical', value: latestAudit.criticalCount || 0, color: '#ef4444' },
-                          { name: 'Warning', value: latestAudit.warningCount || 0, color: '#f59e0b' },
-                          { name: 'Info', value: latestAudit.infoCount || 0, color: '#3b82f6' }
-                        ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '12px', color: '#fff' }}
-                      />
-                      <Legend 
-                        iconType="circle"
-                        wrapperStyle={{ color: '#9ca3af' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <Bug className="w-12 h-12 text-gray-600 mb-4" />
-                    <p className="text-gray-400 text-center">Run an audit to see issue breakdown</p>
-                  </div>
-                )}
+                        View All Issues
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <AlertTriangle className="w-12 h-12 text-gray-600 mb-4" />
+                      <p className="text-gray-400 text-center">Run an audit to see action items</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           ) : (

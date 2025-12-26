@@ -36,7 +36,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hi! I'm Repo Mind AI. Ask me anything about your codebase, and I'll provide context-aware answers using RAG."
+      content: "Hi! I'm Repo Mind AI. Ask me anything about your codebase, and I'll provide context-aware answers based on your repository's code."
     }
   ])
   const [input, setInput] = useState('')
@@ -158,7 +158,6 @@ export default function Chat() {
                 <Bot className="w-8 h-8 text-gray-900" />
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">Chat with Your Codebase</h1>
-                  <p className="text-sm text-gray-600">RAG-powered AI assistant</p>
                 </div>
               </div>
             </div>
@@ -292,7 +291,7 @@ export default function Chat() {
               </motion.button>
             </div>
             <p className="text-xs text-gray-500 mt-3 text-center">
-              Powered by RAG and GPT-4. Press Enter to send.
+              Press Enter to send
             </p>
           </div>
         </div>

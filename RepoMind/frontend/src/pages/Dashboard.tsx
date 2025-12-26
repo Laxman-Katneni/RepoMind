@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import api from '../api/axios'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Shield, GitPullRequest, MessageSquare, AlertTriangle, CheckCircle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown } from 'lucide-react'
+import { Shield, GitPullRequest, MessageSquare, AlertTriangle, CheckCircle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, Info } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface DashboardMetrics {
@@ -289,16 +289,54 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold text-gray-900">{repoName}</h1>
             </div>
             <div className="flex items-center gap-3">
+              {/* Button 1: Sync Data - First step */}
               <button
-                onClick={startAudit}
-                disabled={auditing}
+                onClick={syncData}
+                disabled={syncing}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
-                title="Run AI code audit"
+                title="Fetch pull requests from GitHub"
               >
-                <Bug className={`w-4 h-4 ${auditing ? 'animate-pulse' : ''}`} />
-                {auditing ? 'Auditing...' : 'Audit Code'}
+                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync Data'}
               </button>
               
+              {/* Button 2: Index for Chat - Second step (optional) */}
+              <button
+                onClick={indexRepository}
+                disabled={indexing}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
+                title="Index repository code for AI chat"
+              >
+                <Shield className={`w-4 h-4 ${indexing ? 'animate-spin' : ''}`} />
+                {indexing ? 'Indexing...' : 'Index for Chat'}
+              </button>
+              
+              {/* Button 3: Audit Code - Third step */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={startAudit}
+                  disabled={auditing}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
+                  title="Run AI code audit"
+                >
+                  <Bug className={`w-4 h-4 ${auditing ? 'animate-pulse' : ''}`} />
+                  {auditing ? 'Auditing...' : 'Audit Code'}
+                </button>
+                
+                {/* Info tooltip */}
+                <div className="group relative">
+                  <Info className="w-4 h-4 text-gray-400 hover:text-blue-600 cursor-help transition-colors" />
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 z-50">
+                    <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+                      <strong className="block mb-1">💡 Tip:</strong>
+                      Index your repository first for better AI audit results with code context
+                    </div>
+                    <div className="w-2 h-2 bg-gray-900 transform rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1"></div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Button 4: View Audit Results - Shows when available */}
               {!loadingAudit && latestAudit && (
                 <button
                   onClick={() => navigate(`/app/audit-results/${latestAudit.auditId}`)}
@@ -310,25 +348,7 @@ export default function Dashboard() {
                 </button>
               )}
               
-              <button
-                onClick={indexRepository}
-                disabled={indexing}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
-                title="Index repository code for AI chat"
-              >
-                <Shield className={`w-4 h-4 ${indexing ? 'animate-spin' : ''}`} />
-                {indexing ? 'Indexing...' : 'Index for Chat'}
-              </button>
-              <button
-                onClick={syncData}
-                disabled={syncing}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
-              >
-                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Syncing...' : 'Sync Data'}
-              </button>
-              
-              {/* User Menu */}
+              {/* User Menu - Always last */}
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
@@ -360,17 +380,7 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-          
-          {/* Info Banner */}
-          <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-            <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-            <span className="text-xs text-blue-900">
-              <strong>Tip:</strong> Index your repository first for better AI audit results with code context
-            </span>
           </div>
-        </div>
       </header>
 
         {/* Content */}
@@ -402,6 +412,71 @@ export default function Dashboard() {
             </div>
           ) : metrics ? (
             <>
+              {/* Getting Started Card - Show when no activity */}
+              {metrics.totalReviews === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 mb-10 border border-gray-700 shadow-xl"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="bg-blue-500/10 rounded-full p-3">
+                      <Shield className="w-8 h-8 text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-white mb-3">🚀 Get Started with Repo Mind</h2>
+                      <p className="text-gray-300 mb-6">Follow these steps to set up your repository for automated code reviews:</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">1</div>
+                            <h3 className="font-semibold text-white">Sync Data</h3>
+                          </div>
+                          <p className="text-sm text-gray-400">Fetch pull requests from your GitHub repository</p>
+                        </div>
+                        
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="bg-gray-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">2</div>
+                            <h3 className="font-semibold text-white">Index for Chat <span className="text-xs text-gray-400">(Optional)</span></h3>
+                          </div>
+                          <p className="text-sm text-gray-400">Enable AI-powered chat about your codebase</p>
+                        </div>
+                        
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="bg-gray-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">3</div>
+                            <h3 className="font-semibold text-white">View Pull Requests</h3>
+                          </div>
+                          <p className="text-sm text-gray-400">Browse synced PRs in the Pull Requests tab</p>
+                        </div>
+                        
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="bg-gray-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">4</div>
+                            <h3 className="font-semibold text-white">Audit Code</h3>
+                          </div>
+                          <p className="text-sm text-gray-400">Run automated AI code audit on your repository</p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-6 flex items-center gap-3">
+                        <button
+                          onClick={syncData}
+                          disabled={syncing}
+                          className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 shadow-lg font-semibold transition-all hover:scale-105"
+                        >
+                          <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+                          {syncing ? 'Syncing...' : 'Start: Sync Data'}
+                        </button>
+                        <p className="text-sm text-gray-400">← Click here to begin</p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              
               {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
               <MetricCard

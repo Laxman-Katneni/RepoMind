@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Github, Shield, MessageSquare, Zap, CheckCircle, ArrowRight } from 'lucide-react'
+import { Github, Shield, MessageSquare, Zap, CheckCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export default function Landing() {
@@ -34,28 +34,20 @@ export default function Landing() {
             Repo Mind
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-900">
-              AI-Powered Code Security
+              AI-Powered Code Intelligence
             </span>
           </h1>
           <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Automated pull request reviews with context-aware AI. Catch bugs, security issues, and code smells before they reach production.
+            Comprehensive code audits with architectural insights, automated PR reviews, and intelligent chat for your GitHub repositories. Catch bugs and security issues before they reach production.
           </p>
           
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={() => navigate('/login')}
-              className="px-8 py-4 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition flex items-center gap-3 text-lg font-semibold shadow-lg hover:shadow-xl"
-            >
-              <Github className="w-5 h-5" />
-              Login with GitHub
-            </button>
-            <button
-              className="px-8 py-4 bg-gray-100 text-gray-900 rounded-xl hover:bg-gray-200 transition flex items-center gap-3 text-lg font-semibold"
-            >
-              <ArrowRight className="w-5 h-5" />
-              View Demo
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-8 py-4 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition flex items-center gap-3 text-lg font-semibold shadow-lg hover:shadow-xl mx-auto"
+          >
+            <Github className="w-5 h-5" />
+            Get Started with GitHub
+          </button>
         </motion.div>
       </section>
 
@@ -102,8 +94,42 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-6 py-8 text-center text-gray-500 border-t border-gray-100">
-        <p>© 2025 Repo Mind. Built with Spring Boot + React + AI.</p>
+      <footer className="container mx-auto px-6 py-8 text-center border-t border-gray-100">
+        <p className="text-gray-500 mb-4">© 2025 Repo Mind. All rights reserved.</p>
+        <div className="flex items-center justify-center gap-3 text-gray-600">
+          <span className="text-sm">Created by</span>
+          <a 
+            href="https://linkedin.com/in/laxman-katneni" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:opacity-70 transition"
+          >
+            <img src="/laxman-logo.png" alt="Laxman Katneni" className="h-6 inline" />
+          </a>
+          <span className="text-sm font-semibold">Laxman Katneni</span>
+          <a 
+            href="https://linkedin.com/in/laxman-katneni" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:text-gray-900 transition"
+            title="LinkedIn"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+            </svg>
+          </a>
+          <a 
+            href="https://github.com/Laxman-Katneni" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:text-gray-900 transition"
+            title="GitHub"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+          </a>
+        </div>
       </footer>
     </div>
   )
@@ -112,32 +138,32 @@ export default function Landing() {
 const features = [
   {
     icon: Shield,
-    title: 'Context-Aware Reviews',
-    description: 'AI analyzes your entire codebase to provide contextual feedback on PRs.'
-  },
-  {
-    icon: MessageSquare,
-    title: 'Chat with Codebase',
-    description: 'Ask questions about your code and get instant AI-powered answers.'
+    title: 'Advanced Code Audits',
+    description: 'Deep security scanning with architectural insights and best practice recommendations, not just basic linting.'
   },
   {
     icon: CheckCircle,
-    title: 'Automated Security Checks',
-    description: 'Detect vulnerabilities and security issues before deployment.'
-  },
-  {
-    icon: Zap,
-    title: 'Instant Feedback',
-    description: 'Get PR reviews in seconds, not hours. Speed up your development workflow.'
-  },
-  {
-    icon: Github,
-    title: 'GitHub Integration',
-    description: 'Seamless integration with GitHub via webhooks and OAuth.'
+    title: 'Automated PR Reviews',
+    description: 'AI-powered pull request analysis with actionable feedback and intelligent code suggestions.'
   },
   {
     icon: MessageSquare,
+    title: 'Intelligent Code Chat',
+    description: 'Ask questions about your codebase and get instant, context-aware answers powered by AI.'
+  },
+  {
+    icon: Zap,
     title: 'Smart Caching',
-    description: 'Avoid duplicate reviews with intelligent commit-based caching.'
+    description: 'Efficient review system with intelligent caching to avoid duplicate analysis and speed up workflows.'
+  },
+  {
+    icon: Github,
+    title: 'Seamless GitHub Integration',
+    description: 'Easy setup with GitHub OAuth and webhook integration for automated workflows.'
+  },
+  {
+    icon: Shield,
+    title: 'Security-First Analysis',
+    description: 'Proactively detect vulnerabilities, code smells, and potential security issues before deployment.'
   }
 ]

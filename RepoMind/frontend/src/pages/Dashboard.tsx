@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import api from '../api/axios'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Shield, GitPullRequest, MessageSquare, AlertTriangle, CheckCircle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, Info } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { Shield, GitPullRequest, MessageSquare, AlertTriangle, CheckCircle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, Info, BarChart } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface DashboardMetrics {
@@ -239,9 +239,7 @@ export default function Dashboard() {
     }
   }
 
-  const chartData = metrics?.reviewsPerDay
-    ? Object.entries(metrics.reviewsPerDay).map(([name, reviews]) => ({ name, reviews }))
-    : []
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -511,22 +509,46 @@ export default function Dashboard() {
 
               {/* Chart */}
               <div className="bg-gray-900 rounded-3xl p-8 border border-gray-800 shadow-sm hover:shadow-xl transition-shadow duration-500 ease-out">
-                <h2 className="text-2xl font-semibold text-white mb-8">Review Activity</h2>
-                {chartData.length > 0 ? (
+                <h2 className="text-2xl font-semibold text-white mb-8">Latest Audit Breakdown</h2>
+                {latestAudit ? (
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="name" stroke="#9ca3af" />
-                      <YAxis stroke="#9ca3af" />
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Critical', value: latestAudit.criticalCount || 0, color: '#ef4444' },
+                          { name: 'Warning', value: latestAudit.warningCount || 0, color: '#f59e0b' },
+                          { name: 'Info', value: latestAudit.infoCount || 0, color: '#3b82f6' }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Critical', value: latestAudit.criticalCount || 0, color: '#ef4444' },
+                          { name: 'Warning', value: latestAudit.warningCount || 0, color: '#f59e0b' },
+                          { name: 'Info', value: latestAudit.infoCount || 0, color: '#3b82f6' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '12px' }}
-                        labelStyle={{ color: '#fff' }}
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '12px', color: '#fff' }}
                       />
-                      <Bar dataKey="reviews" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
-                    </BarChart>
+                      <Legend 
+                        iconType="circle"
+                        wrapperStyle={{ color: '#9ca3af' }}
+                      />
+                    </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <p className="text-gray-400 text-center py-12">No review data available yet</p>
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Bug className="w-12 h-12 text-gray-600 mb-4" />
+                    <p className="text-gray-400 text-center">Run an audit to see issue breakdown</p>
+                  </div>
                 )}
               </div>
             </>

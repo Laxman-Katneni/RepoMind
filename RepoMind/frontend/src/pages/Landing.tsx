@@ -94,24 +94,31 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-6 py-8 text-center border-t border-gray-100">
-        <p className="text-gray-500 mb-4">© 2025 Repo Mind. All rights reserved.</p>
-        <div className="flex items-center justify-center gap-3 text-gray-600">
-          <span className="text-sm">Created by</span>
+      <footer className="container mx-auto px-6 py-12 text-center border-t border-gray-100">
+        {/* Logo */}
+        <div className="mb-4">
           <a 
             href="https://linkedin.com/in/laxman-katneni" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="hover:opacity-70 transition"
+            className="inline-block hover:opacity-70 transition"
           >
-            <img src="/laxman-logo.png" alt="Laxman Katneni" className="h-6 inline" />
+            <img src="/laxman-logo.png" alt="Laxman Katneni" className="h-12 mx-auto" />
           </a>
-          <span className="text-sm font-semibold">Laxman Katneni</span>
+        </div>
+        
+        {/* Name */}
+        <p className="text-gray-600 text-sm mb-3">
+          Created by <span className="font-semibold text-gray-900">Laxman Katneni</span>
+        </p>
+        
+        {/* Social Links */}
+        <div className="flex items-center justify-center gap-4 mb-6">
           <a 
             href="https://linkedin.com/in/laxman-katneni" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="hover:text-gray-900 transition"
+            className="text-gray-600 hover:text-gray-900 transition"
             title="LinkedIn"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -122,7 +129,7 @@ export default function Landing() {
             href="https://github.com/Laxman-Katneni" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="hover:text-gray-900 transition"
+            className="text-gray-600 hover:text-gray-900 transition"
             title="GitHub"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -130,6 +137,9 @@ export default function Landing() {
             </svg>
           </a>
         </div>
+        
+        {/* Copyright */}
+        <p className="text-gray-500 text-sm">© 2025 Repo Mind. All rights reserved.</p>
       </footer>
     </div>
   )

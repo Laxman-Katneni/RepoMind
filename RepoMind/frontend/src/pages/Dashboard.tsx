@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import api from '../api/axios'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
-import { Shield, GitPullRequest, MessageSquare, AlertTriangle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, Info, BarChart } from 'lucide-react'
+import { Shield, GitPullRequest, MessageSquare, AlertTriangle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, BarChart } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface DashboardMetrics {
@@ -284,7 +284,7 @@ export default function Dashboard() {
               >
                 <Menu className="w-6 h-6" />
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">{repoName}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{repoName.split('/').pop() || repoName}</h1>
             </div>
             <div className="flex items-center gap-3">
               {/* Button 1: Sync Data - First step */}
@@ -310,29 +310,15 @@ export default function Dashboard() {
               </button>
               
               {/* Button 3: Audit Code - Third step */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={startAudit}
-                  disabled={auditing}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
-                  title="Run AI code audit"
-                >
-                  <Bug className={`w-4 h-4 ${auditing ? 'animate-pulse' : ''}`} />
-                  {auditing ? 'Auditing...' : 'Audit Code'}
-                </button>
-                
-                {/* Info tooltip */}
-                <div className="group relative">
-                  <Info className="w-4 h-4 text-gray-400 hover:text-blue-600 cursor-help transition-colors" />
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 z-50">
-                    <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
-                      <strong className="block mb-1">💡 Tip:</strong>
-                      Index your repository first for better AI audit results with code context
-                    </div>
-                    <div className="w-2 h-2 bg-gray-900 transform rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1"></div>
-                  </div>
-                </div>
-              </div>
+              <button
+                onClick={startAudit}
+                disabled={auditing}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
+                title="Run AI code audit"
+              >
+                <Bug className={`w-4 h-4 ${auditing ? 'animate-pulse' : ''}`} />
+                {auditing ? 'Auditing...' : 'Audit Code'}
+              </button>
               
               {/* Button 4: View Audit Results - Shows when available */}
               {!loadingAudit && latestAudit && (

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import api from '../api/axios'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
-import { Shield, GitPullRequest, MessageSquare, AlertTriangle, CheckCircle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, Info, BarChart } from 'lucide-react'
+import { Shield, GitPullRequest, MessageSquare, AlertTriangle, Menu, Loader, RefreshCw, Bug, Clock, LogOut, User, ChevronDown, Info, BarChart } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface DashboardMetrics {
@@ -478,32 +478,32 @@ export default function Dashboard() {
               {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
               <MetricCard
+                title="Total Issues"
+                value={latestAudit ? ((latestAudit.criticalCount || 0) + (latestAudit.warningCount || 0) + (latestAudit.infoCount || 0)).toString() : '0'}
+                change={latestAudit ? `${latestAudit.totalFilesScanned || 0} files` : 'No audit yet'}
+                icon={Bug}
+                color="blue"
+              />
+              <MetricCard
                 title="Critical Issues"
-                value={metrics.criticalIssuesCount.toString()}
-                change="-3"
+                value={latestAudit ? (latestAudit.criticalCount || 0).toString() : '0'}
+                change={latestAudit ? 'High priority' : 'Run audit'}
                 icon={AlertTriangle}
                 color="red"
               />
               <MetricCard
-                title="PRs Reviewed"
-                value={metrics.totalReviews.toString()}
-                change="+8"
-                icon={GitPullRequest}
-                color="blue"
-              />
-              <MetricCard
-                title="Auto-Approved"
-                value={Math.floor(metrics.totalReviews * 0.66).toString()}
-                change="+5"
-                icon={CheckCircle}
-                color="green"
-              />
-              <MetricCard
-                title="Avg Review Time"
-                value={`${metrics.averageReviewTime}s`}
-                change="-0.8s"
-                icon={Clock}
+                title="Files Scanned"
+                value={latestAudit ? (latestAudit.totalFilesScanned || 0).toString() : '0'}
+                change={latestAudit ? `${latestAudit.filesWithIssues || 0} with issues` : 'No scan'}
+                icon={Shield}
                 color="purple"
+              />
+              <MetricCard
+                title="Last Audit"
+                value={latestAudit ? new Date(latestAudit.completedAt || latestAudit.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}
+                change={latestAudit ? new Date(latestAudit.completedAt || latestAudit.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Start scanning'}
+                icon={Clock}
+                color="green"
               />
             </div>
 

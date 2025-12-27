@@ -486,8 +486,8 @@ export default function Dashboard() {
               />
               <MetricCard
                 title="Last Audit"
-                value={latestAudit && latestAudit.completedAt ? new Date(latestAudit.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}
-                change={latestAudit && latestAudit.completedAt ? new Date(latestAudit.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Run audit'}
+                value={latestAudit && latestAudit.createdAt ? new Date(latestAudit.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}
+                change={latestAudit && latestAudit.createdAt ? new Date(latestAudit.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Run audit'}
                 icon={Clock}
                 color="green"
               />
@@ -631,7 +631,16 @@ export default function Dashboard() {
                     <h2 className="text-2xl font-bold text-gray-900">Code Audit</h2>
                   </div>
                   <button
-                    onClick={() => setShowAuditModal(false)}
+                    onClick={() => {
+                      setShowAuditModal(false)
+                      // Refresh audit data when modal closes
+                      if (auditStatus?.status === 'COMPLETED') {
+                        const selectedRepoId = localStorage.getItem('selectedRepoId')
+                        if (selectedRepoId) {
+                          fetchLatestAudit(selectedRepoId)
+                        }
+                      }
+                    }}
                     className="text-gray-400 hover:text-gray-900 transition"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

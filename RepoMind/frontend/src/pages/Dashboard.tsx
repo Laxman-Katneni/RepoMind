@@ -81,6 +81,7 @@ export default function Dashboard() {
     try {
       setLoadingAudit(true)
       const response = await api.get(`/api/audits/latest/${repoId}`)
+      console.log('Latest audit data:', response.data) // Debug: check what fields exist
       setLatestAudit(response.data)
     } catch (err: any) {
       // 404 is expected if no audits exist
@@ -397,7 +398,7 @@ export default function Dashboard() {
           ) : metrics ? (
             <>
               {/* Getting Started Card - Show when no activity */}
-              {!latestAudit && (
+              {!latestAudit && metrics.totalReviews === 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
